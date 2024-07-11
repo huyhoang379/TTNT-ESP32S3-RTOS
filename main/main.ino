@@ -13,7 +13,7 @@
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883
 #define AIO_USERNAME    "hoang451"
-#define AIO_KEY         ""  
+#define AIO_KEY         "your_ada_fruit_key_here"  
 
 // Define your tasks here
 void TaskBlink(void *pvParameters);
@@ -32,10 +32,10 @@ UltraSonicDistanceSensor ultrasonic(D9, D10);
 SoftServo myservo;
 WiFiClient client;
 
-float objectCelsius = 20.0;
-float objectHumidity;
-float objectSoilMoisture;
-float objectLight;
+float previousTemperature = 0;
+float previousHumidity = 0;
+int previousSoilMoisture = 0;
+int previousLight = 0;
 
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
@@ -251,6 +251,7 @@ void TaskDistanceAndServo(void *pvParameters) {  // This is a task.
       myservo.tick();
       myservo.write(90);
     }
+    delay(1000);
   }
 }
 
@@ -277,40 +278,53 @@ void TaskMQTT(void *pvParameters) {
       }
     }
 
-    objectCelsius = dht20.getTemperature();
-    if (!temperature.publish(objectCelsius)) {
-      Serial.println(F("Temperature Failed"));
-    }
-    else {
-      Serial.println(F("Temperature OK!"));
-      objectCelsius += 10;
-      if(objectCelsius >= 60)
-        objectCelsius = 1;
+    // Read the sensor values
+    float currentTemperature = dht20.getTemperature();
+    float currentHumidity = dht20.getHumidity();
+    int currentSoilMoisture = analogRead(A0);
+    int currentLight = analogRead(A1);
+
+    // Publish the temperature if it has changed
+    if (currentTemperature != previousTemperature) {
+      if (!temperature.publish(currentTemperature)) {
+        Serial.println(F("Temperature Failed"));
+      } else {
+        Serial.println(F("Temperature OK!"));
+        previousTemperature = currentTemperature;
+      }
     }
 
-    objectHumidity = dht20.getHumidity();
-    if (!humidity.publish(objectHumidity)) {
-      Serial.println(F("Humidity Failed"));
-    }
-    else {
-      Serial.println(F("Humidity OK!"));
-    }
-
-    objectSoilMoisture = analogRead(A0);
-    if (!soilmoisture.publish(objectSoilMoisture)) {
-      Serial.println(F("Soil Moisture Failed"));
-    }
-    else {
-      Serial.println(F("Soil Moisture OK!"));
+    // Publish the humidity if it has changed
+    if (currentHumidity != previousHumidity) {
+      if (!humidity.publish(currentHumidity)) {
+        Serial.println(F("Humidity Failed"));
+      } else {
+        Serial.println(F("Humidity OK!"));
+        previousHumidity = currentHumidity;
+      }
     }
 
-    objectLight = analogRead(A1);
-    if (!light.publish(objectLight)) {
-      Serial.println(F("Light Failed"));
+    // Publish the soil moisture if it has changed
+    if (currentSoilMoisture != previousSoilMoisture) {
+      if (!soilmoisture.publish((float)currentSoilMoisture)) {
+        Serial.println(F("Soil Moisture Failed"));
+      } else {
+        Serial.println(F("Soil Moisture OK!"));
+        previousSoilMoisture = currentSoilMoisture;
+      }
     }
-    else {
-      Serial.println(F("Light OK!"));
+
+    // Publish the light if it has changed
+    if (currentLight != previousLight) {
+      if (!light.publish((float)currentLight)) {
+        Serial.println(F("Light Failed"));
+      } else {
+        Serial.println(F("Light OK!"));
+        previousLight = currentLight;
+      }
     }
+
+    delay(5000);
   }
 }
 
